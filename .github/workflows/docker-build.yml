@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force rebuild even if tag is unchanged'
+        type: boolean
+        default: false
 
 jobs:
   check-and-build:
@@ -34,7 +39,7 @@ jobs:
           if [ -f .last-built-tag ]; then
             LAST_TAG=$(cat .last-built-tag)
           fi
-          if [ "$LAST_TAG" = "${{ steps.nanobot-release.outputs.tag }}" ]; then
+          if [ "$LAST_TAG" = "${{ steps.nanobot-release.outputs.tag }}" ] && [ "${{ github.event.inputs.force }}" != "true" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
             echo "Already built ${{ steps.nanobot-release.outputs.tag }}, skipping."
           else
