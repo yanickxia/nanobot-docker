@@ -84,6 +84,15 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/nanobot-docker:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/nanobot-docker:${{ steps.nanobot-release.outputs.tag }}
 
+      - name: Update Docker Hub description
+        if: steps.check.outputs.skip == 'false'
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ secrets.DOCKERHUB_USERNAME }}/nanobot-docker
+          readme-filepath: ./README.md
+
       - name: Update last built tag
         if: steps.check.outputs.skip == 'false'
         run: |
