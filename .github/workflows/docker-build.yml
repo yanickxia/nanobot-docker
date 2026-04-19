@@ -20,30 +20,33 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get latest nanobot commit SHA
-        id: nanobot-sha
+      - name: Get latest nanobot release tag
+        id: nanobot-release
         run: |
-          SHA=$(curl -s https://api.github.com/repos/HKUDS/nanobot/commits/main | jq -r '.sha')
-          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          TAG=$(curl -s https://api.github.com/repos/HKUDS/nanobot/releases/latest | jq -r '.tag_name')
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Latest nanobot release: $TAG"
 
       - name: Check if rebuild needed
         id: check
         run: |
-          LAST_SHA=""
-          if [ -f .last-built-sha ]; then
-            LAST_SHA=$(cat .last-built-sha)
+          LAST_TAG=""
+          if [ -f .last-built-tag ]; then
+            LAST_TAG=$(cat .last-built-tag)
           fi
-          if [ "$LAST_SHA" = "${{ steps.nanobot-sha.outputs.sha }}" ]; then
+          if [ "$LAST_TAG" = "${{ steps.nanobot-release.outputs.tag }}" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "No changes in nanobot source, skipping build."
+            echo "Already built ${{ steps.nanobot-release.outputs.tag }}, skipping."
           else
             echo "skip=false" >> $GITHUB_OUTPUT
-            echo "nanobot source changed, will build."
+            echo "New release ${{ steps.nanobot-release.outputs.tag }} detected, will build."
           fi
 
-      - name: Clone nanobot source
+      - name: Clone nanobot at release tag
         if: steps.check.outputs.skip == 'false'
-        run: git clone https://github.com/HKUDS/nanobot.git /tmp/nanobot
+        run: |
+          git clone --depth 1 --branch ${{ steps.nanobot-release.outputs.tag }} \
+            https://github.com/HKUDS/nanobot.git /tmp/nanobot
 
       - name: Login to GitHub Container Registry
         if: steps.check.outputs.skip == 'false'
@@ -65,14 +68,14 @@ jobs:
           push: true
           tags: |
             ghcr.io/yanickxia/nanobot-docker:latest
-            ghcr.io/yanickxia/nanobot-docker:${{ steps.nanobot-sha.outputs.sha }}
+            ghcr.io/yanickxia/nanobot-docker:${{ steps.nanobot-release.outputs.tag }}
 
-      - name: Update last built SHA
+      - name: Update last built tag
         if: steps.check.outputs.skip == 'false'
         run: |
-          echo "${{ steps.nanobot-sha.outputs.sha }}" > .last-built-sha
+          echo "${{ steps.nanobot-release.outputs.tag }}" > .last-built-tag
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .last-built-sha
-          git commit -m "chore: update built SHA to ${{ steps.nanobot-sha.outputs.sha }}"
+          git add .last-built-tag
+          git commit -m "chore: built nanobot ${{ steps.nanobot-release.outputs.tag }}"
           git push
